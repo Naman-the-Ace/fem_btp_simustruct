@@ -296,21 +296,31 @@ def analytical_stress_field(
 
         factor = sigma_applied / 2.0
 
-        # Radial and circumferential stress corrections
-        sigma_rr = factor * ((1 - ratio) + (1 - 4*ratio + 3*ratio_4) * cos2t)
-        sigma_tt = factor * ((1 + ratio) - (1 + 3*ratio_4) * cos2t)
-        sigma_rt = factor * (-(1 + 2*ratio - 3*ratio_4)) * sin2t
+        # Full Kirsch stress field (Cartesian, superimposed on uniform field)
+        # sigma_rr and sigma_tt from Kirsch solution for infinite plate
+        sigma_rr_k = factor * ((1 - ratio) + (1 - 4*ratio + 3*ratio_4) * cos2t)
+        sigma_tt_k = factor * ((1 + ratio) - (1 + 3*ratio_4) * cos2t)
+        sigma_rt_k = factor * (-(1 + 2*ratio - 3*ratio_4)) * sin2t
 
-        # Convert polar to Cartesian
+        # Convert polar to Cartesian stress components
         cos_t = np.cos(theta)
         sin_t = np.sin(theta)
         cos2 = cos_t**2
         sin2 = sin_t**2
         cossin = cos_t * sin_t
 
-        sigma_xx += (sigma_rr * cos2 + sigma_tt * sin2 - 2 * sigma_rt * cossin) - sigma_xx_base
-        sigma_yy += (sigma_rr * sin2 + sigma_tt * cos2 + 2 * sigma_rt * cossin) - sigma_yy_base
-        sigma_xy += ((sigma_rr - sigma_tt) * cossin + sigma_rt * (cos2 - sin2)) - sigma_xy_base
+        # Kirsch gives TOTAL stress field (not perturbation), so replace base
+        sigma_xx_kirsch = sigma_rr_k * cos2 + sigma_tt_k * sin2 - 2 * sigma_rt_k * cossin
+        sigma_yy_kirsch = sigma_rr_k * sin2 + sigma_tt_k * cos2 + 2 * sigma_rt_k * cossin
+        sigma_xy_kirsch = (sigma_rr_k - sigma_tt_k) * cossin + sigma_rt_k * (cos2 - sin2)
+
+        # Blend: far from hole use base field, near hole use Kirsch (smooth blend via decay)
+        # ratio = (a/r)^2, so at r>>a: ratio->0 and Kirsch->uniform
+        # We accumulate by adding Kirsch perturbation atop base:
+        # Perturbation = Kirsch_total - base_uniform (what Kirsch adds beyond uniform)
+        sigma_xx += sigma_xx_kirsch - sigma_xx_base
+        sigma_yy += sigma_yy_kirsch - sigma_yy_base
+        sigma_xy += sigma_xy_kirsch - sigma_xy_base
 
         # Zero out stress inside holes
         sigma_xx[inside] = 0.0

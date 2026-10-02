@@ -174,9 +174,12 @@ def run_ai_inference(
 
     pred_np = pred.cpu().numpy()
 
-    # Post-process: inverse log-transform for stress
-    stress_vm = postprocess_stress(pred_np[:, 0])
-    stress_vm = np.abs(stress_vm)  # Stress is always positive
+    # Post-process: inverse log-transform for stress (model output is in log-Pa space)
+    # postprocess_stress does exp(x)-1, result is in Pascals
+    stress_vm_pa = postprocess_stress(pred_np[:, 0])
+    stress_vm_pa = np.abs(stress_vm_pa)
+    # Convert Pa → MPa for display
+    stress_vm = stress_vm_pa / 1e6
 
     disp_x = pred_np[:, 1]
     disp_y = pred_np[:, 2]
@@ -192,14 +195,14 @@ def run_ai_inference(
         disp_x[inside] = 0.0
         disp_y[inside] = 0.0
 
-    # Compute metrics
-    sigma_max = float(np.max(stress_vm))
-    sigma_nominal = abs(load_magnitude) / 1e6 if load_magnitude != 0 else 1.0
-    scf = sigma_max / sigma_nominal if sigma_nominal > 0 else 1.0
+    # Compute metrics — everything in MPa now
+    sigma_max_mpa = float(np.max(stress_vm))
+    sigma_nominal_mpa = abs(load_magnitude) / 1e6 if load_magnitude != 0 else 1.0
+    scf = sigma_max_mpa / sigma_nominal_mpa if sigma_nominal_mpa > 0 else 1.0
 
     sigma_y = material.get("sigma_y", MATERIALS.get(material_key, {}).get("sigma_y", 250e6))
     sigma_y_mpa = sigma_y / 1e6
-    safety_factor = sigma_y_mpa / sigma_max if sigma_max > 0 else float("inf")
+    safety_factor = sigma_y_mpa / sigma_max_mpa if sigma_max_mpa > 0 else float("inf")
 
     t_ms = (time.perf_counter() - t0) * 1000
 
@@ -208,7 +211,7 @@ def run_ai_inference(
         "stress_vm": stress_vm.tolist(),
         "displacement_x": disp_x.tolist(),
         "displacement_y": disp_y.tolist(),
-        "sigma_max_mpa": sigma_max / 1e6,
+        "sigma_max_mpa": sigma_max_mpa,
         "scf": scf,
         "safety_factor": safety_factor,
         "inference_ms": t_ms,
