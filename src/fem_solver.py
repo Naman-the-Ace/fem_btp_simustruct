@@ -327,8 +327,8 @@ def analytical_stress_field(
         sigma_yy[inside] = 0.0
         sigma_xy[inside] = 0.0
 
-    # Von Mises stress
-    stress_vm = np.sqrt(sigma_xx**2 - sigma_xx * sigma_yy + sigma_yy**2 + 3 * sigma_xy**2)
+    # Von Mises stress (still in Pa at this point)
+    stress_vm_pa = np.sqrt(sigma_xx**2 - sigma_xx * sigma_yy + sigma_yy**2 + 3 * sigma_xy**2)
 
     # Displacement (approximate using Hooke's law)
     eps_xx = (sigma_xx - nu * sigma_yy) / E
@@ -338,26 +338,33 @@ def analytical_stress_field(
     disp_x = eps_xx * coords[:, 0]
     disp_y = eps_yy * coords[:, 1]
 
-    # Metrics
-    sigma_max = float(np.max(stress_vm))
-    sigma_nominal = abs(sigma_applied) if sigma_applied != 0 else 1.0
-    scf = sigma_max / sigma_nominal if sigma_nominal > 0 else 1.0
-    safety_factor = (sigma_y / sigma_max) if sigma_max > 0 and sigma_y > 0 else float('inf')
+    # Convert ALL stress arrays Pa → MPa for UI consistency with AI inference output
+    stress_vm   = stress_vm_pa   / 1e6
+    sigma_xx_mpa = sigma_xx / 1e6
+    sigma_yy_mpa = sigma_yy / 1e6
+    sigma_xy_mpa = sigma_xy / 1e6
+
+    # Metrics — everything in MPa now
+    sigma_max_mpa = float(np.max(stress_vm))
+    sigma_nominal_mpa = abs(sigma_applied) / 1e6 if sigma_applied != 0 else 1.0
+    scf = sigma_max_mpa / sigma_nominal_mpa if sigma_nominal_mpa > 0 else 1.0
+    sigma_y_mpa = sigma_y / 1e6
+    safety_factor = (sigma_y_mpa / sigma_max_mpa) if sigma_max_mpa > 0 else float('inf')
 
     t_ms = (time.perf_counter() - t0) * 1000
 
     return {
         "node_coords": coords,
         "coords": coords,
-        "stress_vm": stress_vm,
-        "stress_xx": sigma_xx,
-        "stress_yy": sigma_yy,
-        "stress_xy": sigma_xy,
-        "disp_x": disp_x,
-        "disp_y": disp_y,
+        "stress_vm": stress_vm,           # MPa
+        "stress_xx": sigma_xx_mpa,        # MPa
+        "stress_yy": sigma_yy_mpa,        # MPa
+        "stress_xy": sigma_xy_mpa,        # MPa
+        "disp_x": disp_x,                 # m
+        "disp_y": disp_y,                 # m
         "displacement_x": disp_x,
         "displacement_y": disp_y,
-        "sigma_max_mpa": sigma_max / 1e6,
+        "sigma_max_mpa": sigma_max_mpa,   # MPa
         "scf": scf,
         "safety_factor": safety_factor,
         "fem_time_ms": t_ms,
