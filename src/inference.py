@@ -174,12 +174,10 @@ def run_ai_inference(
 
     pred_np = pred.cpu().numpy()
 
-    # Post-process: inverse log-transform for stress (model output is in log-Pa space)
-    # postprocess_stress does exp(x)-1, result is in Pascals
-    stress_vm_pa = postprocess_stress(pred_np[:, 0])
-    stress_vm_pa = np.abs(stress_vm_pa)
-    # Convert Pa → MPa for display
-    stress_vm = stress_vm_pa / 1e6
+    # Post-process: inverse log-transform for stress
+    # The network predicts load-normalized stress. We multiply it back.
+    stress_vm_norm = postprocess_stress(pred_np[:, 0])
+    stress_vm = np.abs(stress_vm_norm) * (load_magnitude / 1e6)
 
     disp_x = pred_np[:, 1]
     disp_y = pred_np[:, 2]

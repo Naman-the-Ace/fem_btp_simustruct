@@ -251,6 +251,12 @@ def build_training_dataset(
             all_features.append(features)
 
             stress_arr = stress if isinstance(stress, np.ndarray) else np.array(stress)
+            
+            # Physics-informed normalization: stress scales exactly with load
+            # feat_cols[8] is load_mag in MPa (normalized by 1e6)
+            load_mag_feat = feat_cols[8] if len(feat_cols) > 8 else 1.0
+            stress_arr = stress_arr / (load_mag_feat + 1e-8)
+
             if log_transform:
                 stress_arr = preprocess_stress(stress_arr)
             all_stress.append(stress_arr)
